@@ -96,6 +96,32 @@ var stays = StayPointDetector.detectBySequence(points, 50D, 300D);
 String encoded = EncodedPolyline.encode(points, 6);
 ```
 
+## Design & algorithms
+
+geotrack is a thin, stateless layer between raw points and your map / business
+system. It works on a single immutable `GeoPoint` record and exposes pure static
+methods, so the stages below compose freely and stay thread-safe:
+
+```
+parse  ──►  transform  ──►  denoise  ──►  simplify  ──►  analyze
+```
+
+The interesting part is *how* each stage is built, and why:
+
+| Module | Algorithm | Design notes |
+| --- | --- | --- |
+| `TrackSimplifier` | Douglas-Peucker | iterative (never overflows the stack); tolerance is found by **binary search** to fit a point budget in meters; GPS-noise baseline tolerance; even-sampling fallback |
+| `VisvalingamWhyatt` | effective-area removal | monotone removal order yields a true simplification **hierarchy** (a coarse result is always a subset of a finer one); linked list + lazy-invalidated heap, O(n log n) |
+| `LttbSimplifier` | largest-triangle-three-buckets | O(n) and tuning-free; extended to **3-D** `(index, east, north)` so it preserves the time distribution, not just the shape |
+| `KalmanTrackSmoother` | constant-velocity Kalman + **RTS** | forward pass for streaming, backward RTS pass for the offline minimum-variance estimate; local ENU projection; zero-dependency matrix core |
+| `CoordinateTransform` | GCJ02 offset + fixed-point inverse | GCJ02 has no analytic inverse, so it is solved iteratively to centimeter accuracy; BD09 composed from the GCJ02 hop |
+| `TrackSimilarity` | discrete Fréchet / Hausdorff / DTW | O(n·m) time but O(min(n, m)) memory via rolling rows; all distances in meters |
+| `StayPointDetector` | Li et al. 2008 | also emits the **trailing** stay that the textbook pseudo-code drops |
+| `geometry` | haversine + local plane | sphere for distance, equirectangular projection for geometry; spherical centroid via a 3-D unit-vector mean |
+
+The full write-up — process/measurement models, recurrences, complexity tables
+and references — is in **[`docs/DESIGN.md`](docs/DESIGN.md)**.
+
 ## API at a glance
 
 ```

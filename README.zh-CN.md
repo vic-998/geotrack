@@ -90,6 +90,29 @@ var stays = StayPointDetector.detectBySequence(points, 50D, 300D);
 String encoded = EncodedPolyline.encode(points, 6);
 ```
 
+## 设计与算法
+
+geotrack 是位于原始定位点与地图／业务系统之间的一层薄而**无状态**的库：围绕不可变的 `GeoPoint` record，全部是纯静态方法，因此下面的阶段可以自由组合、天然线程安全：
+
+```
+解析  ──►  坐标转换  ──►  去噪  ──►  抽稀  ──►  分析
+```
+
+关键不在"怎么用"，而在每个阶段**怎么设计、为什么这么设计**：
+
+| 模块 | 算法 | 设计要点 |
+| --- | --- | --- |
+| `TrackSimplifier` | 道格拉斯-普克 | 迭代实现（绝不爆栈）；容差以**米**为单位、用**二分搜索**拟合点数预算；带 GPS 噪声基准容差；等间隔兜底 |
+| `VisvalingamWhyatt` | 有效面积删除 | 删除顺序单调，得到真正的抽稀**层级**（粗结果必是细结果的子集）；链表 + 惰性失效堆，O(n log n) |
+| `LttbSimplifier` | 最大三角桶 | O(n) 且无需调参；扩展到**三维** `(索引, 东, 北)`，保留时间分布而非只有形状 |
+| `KalmanTrackSmoother` | 匀速卡尔曼 + **RTS** | 前向支持流式，后向 RTS 得到离线最小方差估计；局部东北平面投影；零依赖矩阵运算 |
+| `CoordinateTransform` | GCJ02 偏移 + 不动点反解 | GCJ02 无解析反函数，用迭代解到厘米级；BD09 由 GCJ02 一跳组合 |
+| `TrackSimilarity` | 离散 Fréchet / Hausdorff / DTW | 时间 O(n·m)，用滚动数组把空间降到 O(min(n, m))；距离单位为米 |
+| `StayPointDetector` | Li et al. 2008 | 额外输出教科书伪代码会丢掉的**尾部**停留 |
+| `geometry` | haversine + 局部平面 | 测距用球面，几何用等距圆柱投影；球面质心用三维单位向量均值 |
+
+完整的推导——过程／观测模型、递推式、复杂度表与参考文献——见 **[`docs/DESIGN.zh-CN.md`](docs/DESIGN.zh-CN.md)**。
+
 ## 模块概览
 
 ```
