@@ -252,8 +252,8 @@ mvn clean install
 `pom.xml` 已配置好 `maven-source-plugin`、`maven-javadoc-plugin`、`maven-gpg-plugin`
 以及 `distributionManagement`（OSSRH）。发布前请：
 
-1. 将 `pom.xml` 中的 `groupId`、`url`、`scm`、`developers` 改成你自己的信息
-   （Maven Central 要求 groupId 对应可验证的域名所有权，`com.boyicloud` 需要你拥有该域）；
+1. 确认 `pom.xml` 中的 `url`、`scm`、`developers`。`groupId` `com.boyicloud`
+   对应 `boyicloud.com` 域名，在 Central Portal 注册命名空间时用 DNS `TXT` 记录验证所有权即可；
 2. 在 `~/.m2/settings.xml` 中配置 `ossrh` 账户；
 3. 准备 GPG 密钥并发布：
 

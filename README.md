@@ -260,9 +260,9 @@ The `package` phase also produces `geotrack-0.1.0.jar`, `-sources.jar` and
 `maven-gpg-plugin` and a `distributionManagement` section (OSSRH). Before
 publishing:
 
-1. Set the `groupId`, `url`, `scm` and `developers` in `pom.xml` to your own
-   values (Maven Central requires the groupId to map to a domain you can verify;
-   `com.boyicloud` requires you to own that domain);
+1. Confirm the `url`, `scm` and `developers` in `pom.xml`. The `groupId`
+   `com.boyicloud` maps to the `boyicloud.com` domain, so verify ownership with a
+   DNS `TXT` record when registering the namespace on the Central Portal;
 2. configure the `ossrh` account in `~/.m2/settings.xml`;
 3. prepare a GPG key and deploy:
 
