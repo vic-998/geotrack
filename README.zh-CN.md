@@ -1,32 +1,38 @@
 # geotrack
 
 [![CI](https://github.com/vic-998/geotrack/actions/workflows/ci.yml/badge.svg)](https://github.com/vic-998/geotrack/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/vic-998/geotrack)](https://github.com/vic-998/geotrack/releases)
+[![Maven Central](https://img.shields.io/maven-central/v/com.boyicloud/geotrack.svg)](https://central.sonatype.com/artifact/com.boyicloud/geotrack)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net)
 
 [English](README.md) | **简体中文**
 
-轻量级 Java (21) GPS 轨迹处理工具库：轨迹抽稀压缩（道格拉斯-普克 / Visvalingam-Whyatt / LTTB）、卡尔曼滤波与 RTS 平滑、WGS84/GCJ02/BD09 坐标互转、KML/GPX 解析、Encoded Polyline 编解码、轨迹相似度（Fréchet / Hausdorff / DTW）、Geohash、停留点检测等。
+轻量级 Java 21 GPS 轨迹处理工具库：解析、纠偏、去噪、抽稀与空间分析——覆盖从原始定位点到地图／业务系统之间的那一层。
 
-- 无 Spring / 无数据库依赖，纯 JDK + 少量第三方库
-- 基于 Java 21（使用 record、模式匹配 switch 等）
-- 所有算法为静态工具方法，线程安全、无隐藏状态
-- 轨迹抽稀采用迭代实现（不爆栈）、保序、二分容差搜索
-- 卡尔曼滤波实现前向因果滤波 + 后向 RTS 平滑，矩阵运算零依赖
+![GeoTrack 能力与架构总览](design/geotrack-overview.svg)
+
+## 能力
+
+| 能力 | 解决的问题 |
+| --- | --- |
+| KML / GPX / 坐标串解析 | 把不同来源的数据统一成 `GeoPoint` 轨迹点 |
+| WGS84 · GCJ02 · BD09 转换 | 统一坐标系，支持批量转换 |
+| Kalman 滤波 + RTS 平滑 | 降低 GPS 噪声，让路线更稳定 |
+| Douglas-Peucker / Visvalingam-Whyatt / LTTB | 在保留形状的前提下抽稀与降采样 |
+| Fréchet / Hausdorff / DTW | 比较两条轨迹的相似程度 |
+| Geohash / 球面质心 | 空间编码与中心位置计算 |
+| 停留点检测 | 找出停留位置、到离时间与持续时长 |
+| Encoded Polyline / 腾讯 polyline | 与地图服务交换更紧凑的轨迹数据 |
+
+无 Spring、无数据库，核心基于 JDK 与少量第三方库。所有算法都是静态、线程安全的方法，没有隐藏状态，可以直接放进服务端、批处理程序、桌面工具或你自己的数据管道。
 
 ## 环境要求
 
-- JDK 21+
-- Maven 3.9+（构建）
+- Java 21+
 
 ## 安装
 
-> 尚未发布到 Maven Central。可先从
-> [Releases](https://github.com/vic-998/geotrack/releases) 下载 `geotrack-0.1.0.jar`，
-> 或从源码构建。
-
-发布后即可作为依赖引入：
+Maven：
 
 ```xml
 <dependency>
@@ -44,212 +50,70 @@ implementation 'com.boyicloud:geotrack:0.1.0'
 
 ## 快速开始
 
-### 1. 轨迹抽稀 / 压缩
-
-```java
-import com.boyicloud.geotrack.model.GeoPoint;
-import com.boyicloud.geotrack.simplify.TrackSimplifier;
-
-List<GeoPoint> raw = List.of(
-        new GeoPoint(39.9000, 116.4000, 0, 0),
-        new GeoPoint(39.9001, 116.4001, 0, 1),
-        // ...
-        new GeoPoint(39.9100, 116.4100, 0, 999));
-
-// 压到最多 500 个点，基准容差 5 米（先按 GPS 噪声去抖，超预算再二分压）
-List<GeoPoint> simplified = TrackSimplifier.simplify(raw, 500, 5D);
-
-// 只按固定容差去噪，不限制点数
-List<GeoPoint> denoised = TrackSimplifier.simplifyByTolerance(raw, 5D);
-
-// 直接用道格拉斯-普克
-List<GeoPoint> dp = TrackSimplifier.douglasPeucker(raw, 5D);
-```
-
-### 2. 坐标纠偏（WGS84 -> GCJ02）
-
-```java
-import com.boyicloud.geotrack.transform.CoordinateTransform;
-
-double[] gcj = CoordinateTransform.transformWGS84ToGCJ02(116.397428, 39.90923);
-// gcj[0] = 经度, gcj[1] = 纬度
-
-// 批量转换整条轨迹（保留 altitude / sequence）
-List<GeoPoint> converted = CoordinateTransform.transformBatch(raw);
-```
-
-### 3. 解析 KML / GPX
-
-```java
-import com.boyicloud.geotrack.parse.KmlTrackParser;
-import com.boyicloud.geotrack.parse.GpxTrackParser;
-
-List<GeoPoint> fromKml = KmlTrackParser.parse("route.kml");
-List<GeoPoint> fromGpx = GpxTrackParser.parse("route.gpx");
-```
-
-> 解析器只负责读取原始坐标，不做坐标系转换。若源文件是 WGS84 而业务需要
-> GCJ02，解析后调用 `CoordinateTransform.transformBatch(...)` 即可。
-
-### 4. 解析逗号分隔坐标串
-
-```java
-import com.boyicloud.geotrack.parse.PolylineParser;
-
-// "lat,lng,alt" 或 "lat,lng"
-List<GeoPoint> points = PolylineParser.parse("39.9,116.4,50,39.91,116.41,52");
-```
-
-### 5. 腾讯地图压缩 polyline 解压
-
-```java
-import com.boyicloud.geotrack.geometry.TencentPolyline;
-
-List<double[]> coords = TencentPolyline.decode(compressedPolyline); // [lat, lng]
-List<GeoPoint> points = TencentPolyline.decodeToPoints(compressedPolyline);
-```
-
-### 6. 球面质心
-
-```java
-import com.boyicloud.geotrack.geometry.SphericalCentroid;
-
-double[] center = SphericalCentroid.centroid(points);              // [lat, lng]
-double[] weighted = SphericalCentroid.weightedCentroid(points, weights);
-```
-
-### 7. 卡尔曼滤波 / RTS 平滑（GPS 去噪）
+把一条 GPX 原始轨迹，处理成可直接渲染、去噪并压到最多 500 个点：
 
 ```java
 import com.boyicloud.geotrack.filter.KalmanTrackSmoother;
-
-// 在线（因果）滤波：常数速度模型，4 维状态 [east, north, vEast, vNorth]
-List<GeoPoint> online = KalmanTrackSmoother.filter(raw);
-
-// 离线最小方差估计：前向卡尔曼 + 后向 RTS 平滑，轨迹更顺滑
-List<GeoPoint> offline = KalmanTrackSmoother.smooth(raw);
-
-// 自定义调参：加速度标准差(m/s^2)、GPS 测量噪声(m)、时间步长(s)
-List<GeoPoint> tuned = KalmanTrackSmoother.smooth(raw, 0.5, 10.0, 1.0);
-```
-
-### 8. Visvalingam-Whyatt 面积抽稀
-
-```java
-import com.boyicloud.geotrack.simplify.VisvalingamWhyatt;
-
-// 按点数抽稀：优先删除"有效三角面积"最小的顶点
-List<GeoPoint> vw = VisvalingamWhyatt.simplifyToCount(raw, 200);
-
-// 按面积阈值抽稀（单位：平方米）
-List<GeoPoint> byArea = VisvalingamWhyatt.simplifyByArea(raw, 25.0);
-```
-
-### 9. LTTB 降采样（保留视觉形状）
-
-```java
-import com.boyicloud.geotrack.simplify.LttbSimplifier;
-
-// 三维（索引 + 局部东北平面）最大三角桶降采样，O(n)
-List<GeoPoint> sampled = LttbSimplifier.downsample(raw, 500);
-```
-
-### 10. Google Encoded Polyline 编解码
-
-```java
-import com.boyicloud.geotrack.geometry.EncodedPolyline;
-
-String encoded = EncodedPolyline.encode(points);        // 精度 5
-List<GeoPoint> decoded = EncodedPolyline.decode(encoded);
-String highRes = EncodedPolyline.encode(points, 6);     // 精度 6
-```
-
-### 11. 轨迹相似度（Fréchet / Hausdorff / DTW）
-
-```java
-import com.boyicloud.geotrack.geometry.TrackSimilarity;
-
-double frechet = TrackSimilarity.discreteFrechet(trackA, trackB); // 米，保序
-double hausdorff = TrackSimilarity.hausdorff(trackA, trackB);     // 米，不保序
-double dtw = TrackSimilarity.dtw(trackA, trackB);                 // 米，允许时间伸缩
-```
-
-### 12. Geohash 编解码
-
-```java
-import com.boyicloud.geotrack.geometry.Geohash;
-
-String hash = Geohash.encode(39.9, 116.4, 9);
-double[] center = Geohash.decode(hash);           // [lat, lng]
-double[][] bounds = Geohash.decodeBounds(hash);   // [[minLat,maxLat],[minLng,maxLng]]
-```
-
-### 13. 停留点检测（Li et al. 2008）
-
-```java
-import com.boyicloud.geotrack.analysis.StayPointDetector;
-
-// 真实时间戳（毫秒）
-List<StayPointDetector.StayPoint> stays =
-        StayPointDetector.detect(points, 50D, 300D, timestampsMillis);
-
-// 没有时间戳时，用 sequence 当作秒
-List<StayPointDetector.StayPoint> bySeq =
-        StayPointDetector.detectBySequence(points, 50D, 300D);
-
-for (var stay : stays) {
-    System.out.println(stay.lat() + "," + stay.lng() + " 停留 " + stay.durationSeconds() + "s");
-}
-```
-
-### 14. 坐标系转换扩展
-
-```java
+import com.boyicloud.geotrack.parse.GpxTrackParser;
+import com.boyicloud.geotrack.simplify.TrackSimplifier;
 import com.boyicloud.geotrack.transform.CoordinateTransform;
 
-// WGS84 -> GCJ02，以及迭代反解
-double[] gcj = CoordinateTransform.transformWGS84ToGCJ02(116.397428, 39.90923);
-double[] wgs = CoordinateTransform.transformGCJ02ToWGS84(gcj[0], gcj[1]);
-
-// 百度 BD09 全家桶
-double[] bd = CoordinateTransform.transformWGS84ToBD09(116.397428, 39.90923);
-double[] back = CoordinateTransform.transformBD09ToWGS84(bd[0], bd[1]);
+var raw       = GpxTrackParser.parse("route.gpx");
+var converted = CoordinateTransform.transformBatch(raw); // WGS84 -> GCJ02
+var smooth    = KalmanTrackSmoother.smooth(converted);   // 去除 GPS 噪声
+var ready     = TrackSimplifier.simplify(smooth, 500, 5D);
 ```
 
-## 模块结构
+各步骤相互独立，按需取用。更多示例：
+
+```java
+// 轨迹抽稀（道格拉斯-普克）
+List<GeoPoint> dp = TrackSimplifier.simplifyByTolerance(raw, 5D);
+
+// Visvalingam-Whyatt 面积抽稀
+List<GeoPoint> vw = VisvalingamWhyatt.simplifyToCount(raw, 200);
+
+// LTTB 降采样，保留视觉形状
+List<GeoPoint> lttb = LttbSimplifier.downsample(raw, 500);
+
+// 坐标系转换
+double[] gcj = CoordinateTransform.transformWGS84ToGCJ02(116.397428, 39.90923);
+double[] bd  = CoordinateTransform.transformWGS84ToBD09(116.397428, 39.90923);
+
+// 轨迹相似度（单位：米）
+double frechet = TrackSimilarity.discreteFrechet(trackA, trackB);
+
+// 停留点检测
+var stays = StayPointDetector.detectBySequence(points, 50D, 300D);
+
+// 与地图服务交换紧凑轨迹
+String encoded = EncodedPolyline.encode(points, 6);
+```
+
+## 模块概览
 
 ```
 com.boyicloud.geotrack
-├── model.GeoPoint              轨迹点（lat/lng/altitude/sequence）
+├── model.GeoPoint              轨迹点（纬度 / 经度 / 高度 / 序号）
 ├── simplify
-│   ├── TrackSimplifier         道格拉斯-普克抽稀、二分容差搜索、等间隔兜底
-│   ├── VisvalingamWhyatt      面积抽稀（有效三角面积，O(n log n)）
-│   └── LttbSimplifier         LTTB 降采样（O(n)，保形）
-├── filter.KalmanTrackSmoother  卡尔曼滤波 + RTS 平滑（GPS 去噪）
+│   ├── TrackSimplifier         道格拉斯-普克抽稀（点数预算拟合）
+│   ├── VisvalingamWhyatt       有效面积抽稀
+│   └── LttbSimplifier          LTTB 降采样
+├── filter.KalmanTrackSmoother  卡尔曼滤波 + RTS 平滑
 ├── transform.CoordinateTransform  WGS84 / GCJ02 / BD09 坐标互转
-├── parse.*                     KML / GPX / 逗号坐标串解析（GPX 防 XXE）
+├── parse
+│   ├── KmlTrackParser          KML 轨迹
+│   ├── GpxTrackParser          GPX 轨迹（防 XXE）
+│   └── PolylineParser          逗号分隔坐标串
 ├── analysis.StayPointDetector  停留点检测
 └── geometry
-    ├── TencentPolyline         腾讯地图压缩 polyline 解压
-    ├── EncodedPolyline         Google Encoded Polyline 编解码
+    ├── TencentPolyline         腾讯地图压缩 polyline
+    ├── EncodedPolyline         Google Encoded Polyline
     ├── SphericalCentroid       加权球面质心
     ├── TrackSimilarity         Fréchet / Hausdorff / DTW
     ├── Geohash                 Geohash 编解码
-    └── GeoMath                 测地数学（haversine/方位角/投影/三角面积…）
+    └── GeoMath                 测地数学（haversine / 方位角 / 投影 / 面积）
 ```
-
-## 从源码构建
-
-```bash
-mvn clean package        # 编译、测试、打包
-mvn clean install        # 安装到本地 Maven 仓库
-```
-
-需要 JDK 21+ 与 Maven 3.9+。
-
-## 参与贡献
-
-欢迎提交 Issue 和 Pull Request，提 PR 前请先运行 `mvn clean verify`。
 
 ## License
 
