@@ -1,77 +1,71 @@
 # Releasing geotrack
 
-This document is for maintainers. It describes how to publish `geotrack` to
+This document is for maintainers. It describes how `geotrack` is published to
 Maven Central and how to cut a GitHub release.
 
-## 1. Register the namespace on Maven Central
+## 1. Verify the namespace on the Central Portal
 
-Maven Central is operated through the **Sonatype Central Portal**:
-<https://central.sonatype.com>.
+Publishing is handled by the **Sonatype Central Portal**:
+<https://central.sonatype.com>. Before the first release:
 
 1. Sign in with GitHub.
-2. Create a namespace `com.boyicloud`.
-3. Verify ownership of `boyicloud.com` by adding the `TXT` record the portal
-   shows (or the dedicated verification record) to your DNS.
-4. Wait for the namespace to be marked as *verified*.
+2. Open **Namespaces** → **Add Namespace** and add `com.boyicloud`.
+3. Add the `TXT` record the portal shows to the DNS of `boyicloud.com` and click
+   **Verify**. Without this step every deploy fails with
+   `Namespace 'com.boyicloud' is not allowed`.
+4. Generate a **User Token** (Account → Generate User Token). It yields a
+   username / password pair.
 
-## 2. Prepare GPG signing
+## 2. Configure credentials
 
-Artifacts on Maven Central must be GPG-signed. Generate a key and publish it:
+The `central-publishing-maven-plugin` in `pom.xml` reads credentials from the
+`central` server id. Put them in `~/.m2/settings.xml` (never commit this file):
+
+```xml
+<servers>
+  <server>
+    <id>central</id>
+    <username>USER_TOKEN_USERNAME</username>
+    <password>USER_TOKEN_PASSWORD</password>
+  </server>
+</servers>
+```
+
+For CI, store `OSSRH_USERNAME`, `OSSRH_PASSWORD`, `GPG_PRIVATE_KEY` and
+`GPG_PASSPHRASE` as repository secrets instead.
+
+## 3. GPG signing
+
+Artifacts must be GPG-signed and the public key must be published to a
+keyserver so Central can verify the signatures:
 
 ```bash
 gpg --gen-key
 gpg --keyserver keyserver.ubuntu.com --send-keys <KEY_ID>
 ```
 
-Export the private key so CI can use it:
+If `gpg` is not on `PATH` (e.g. the copy bundled with Git for Windows), point
+Maven at it:
 
 ```bash
-gpg --armor --export-secret-keys <KEY_ID> > private.key
+mvn clean deploy -Dgpg.executable="D:\Git\usr\bin\gpg.exe"
 ```
-
-## 3. Configure credentials
-
-`pom.xml` already declares the `ossrh` server id in `distributionManagement`.
-Either configure it locally in `~/.m2/settings.xml`:
-
-```xml
-<servers>
-  <server>
-    <id>ossrh</id>
-    <username>YOUR_CENTRAL_TOKEN_USERNAME</username>
-    <password>YOUR_CENTRAL_TOKEN</password>
-  </server>
-</servers>
-```
-
-Or (recommended) store these as GitHub Actions secrets and let CI deploy:
-
-| Secret              | Value                                   |
-| ------------------- | --------------------------------------- |
-| `OSSRH_USERNAME`    | Central Portal token username           |
-| `OSSRH_PASSWORD`    | Central Portal token                    |
-| `GPG_PRIVATE_KEY`   | contents of `private.key`               |
-| `GPG_PASSPHRASE`    | passphrase of the GPG key               |
 
 ## 4. Deploy
 
-Locally:
-
 ```bash
-mvn clean deploy -Dgpg.passphrase=YOUR_PASSPHRASE
+mvn clean deploy            # sign, upload and auto-publish (autoPublish=true)
+mvn clean verify            # sign only, no upload
+mvn clean package -Dgpg.skip=true   # local build without signing
 ```
 
-Only sign without publishing:
-
-```bash
-mvn verify                       # sign the artifacts
-mvn -Dgpg.skip=true verify       # skip signing for a local build
-```
+On success the artifacts become available at
+`https://repo1.maven.org/maven2/com/boyicloud/geotrack/`.
 
 ## 5. Cut a GitHub release
 
-Push an annotated tag; the `CI` workflow builds and attaches the jars
-(`geotrack-*.jar`, `-sources.jar`, `-javadoc.jar`) to the release page:
+Push an annotated tag; the `CI` workflow builds and attaches the jars to the
+release page:
 
 ```bash
 git tag -a vX.Y.Z -m "geotrack X.Y.Z"
@@ -82,6 +76,7 @@ git push origin vX.Y.Z
 
 - [ ] `version` in `pom.xml` bumped
 - [ ] `mvn clean verify` green
-- [ ] changelog / release notes drafted
+- [ ] namespace verified, token valid
+- [ ] release notes drafted
 - [ ] tag pushed, CI release job green
-- [ ] artifacts visible on Central Portal
+- [ ] artifacts visible on Maven Central
