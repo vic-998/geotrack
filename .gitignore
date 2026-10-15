@@ -28,3 +28,6 @@ Thumbs.db
 ### Maven ###
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.properties
+
+### Local docs (kept out of the repository) ###
+docs/
