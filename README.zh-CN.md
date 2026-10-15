@@ -1,5 +1,10 @@
 # geotrack
 
+[![CI](https://github.com/vic-998/geotrack/actions/workflows/ci.yml/badge.svg)](https://github.com/vic-998/geotrack/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/vic-998/geotrack)](https://github.com/vic-998/geotrack/releases)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net)
+
 [English](README.md) | **简体中文**
 
 轻量级 Java (21) GPS 轨迹处理工具库：轨迹抽稀压缩（道格拉斯-普克 / Visvalingam-Whyatt / LTTB）、卡尔曼滤波与 RTS 平滑、WGS84/GCJ02/BD09 坐标互转、KML/GPX 解析、Encoded Polyline 编解码、轨迹相似度（Fréchet / Hausdorff / DTW）、Geohash、停留点检测等。
@@ -17,7 +22,11 @@
 
 ## 安装
 
-Maven：
+> 尚未发布到 Maven Central。可先从
+> [Releases](https://github.com/vic-998/geotrack/releases) 下载 `geotrack-0.1.0.jar`，
+> 或从源码构建。
+
+发布后即可作为依赖引入：
 
 ```xml
 <dependency>
@@ -32,9 +41,6 @@ Gradle：
 ```groovy
 implementation 'com.boyicloud:geotrack:0.1.0'
 ```
-
-也可以直接从 [`Releases`](https://github.com/vic-998/geotrack/releases) 下载
-`geotrack-0.1.0.jar`，或者本地 `mvn install` 后引用。
 
 ## 快速开始
 
@@ -232,37 +238,19 @@ com.boyicloud.geotrack
     └── GeoMath                 测地数学（haversine/方位角/投影/三角面积…）
 ```
 
-## 构建与打包
+## 从源码构建
 
 ```bash
-# 编译 + 跑测试 + 打包（产出 target/geotrack-0.1.0.jar）
-mvn clean package
-
-# 跳过测试
-mvn clean package -DskipTests
-
-# 安装到本地仓库，供其他项目引用
-mvn clean install
+mvn clean package        # 编译、测试、打包
+mvn clean install        # 安装到本地 Maven 仓库
 ```
 
-`package` 阶段会同时产出 `geotrack-0.1.0.jar`、`-sources.jar`、`-javadoc.jar`。
+需要 JDK 21+ 与 Maven 3.9+。
 
-## 发布到 Maven Central
+## 参与贡献
 
-`pom.xml` 已配置好 `maven-source-plugin`、`maven-javadoc-plugin`、`maven-gpg-plugin`
-以及 `distributionManagement`（OSSRH）。发布前请：
-
-1. 确认 `pom.xml` 中的 `url`、`scm`、`developers`。`groupId` `com.boyicloud`
-   对应 `boyicloud.com` 域名，在 Central Portal 注册命名空间时用 DNS `TXT` 记录验证所有权即可；
-2. 在 `~/.m2/settings.xml` 中配置 `ossrh` 账户；
-3. 准备 GPG 密钥并发布：
-
-```bash
-mvn clean deploy -Dgpg.passphrase=你的口令
-```
-
-只签名不发布时可用 `mvn verify`。本地构建时用 `-Dgpg.skip=true` 跳过签名。
+欢迎提交 Issue 和 Pull Request，提 PR 前请先运行 `mvn clean verify`。
 
 ## License
 
-[Apache License 2.0](LICENSE)
+基于 [Apache License 2.0](LICENSE) 开源。

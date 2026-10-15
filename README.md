@@ -1,5 +1,10 @@
 # geotrack
 
+[![CI](https://github.com/vic-998/geotrack/actions/workflows/ci.yml/badge.svg)](https://github.com/vic-998/geotrack/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/vic-998/geotrack)](https://github.com/vic-998/geotrack/releases)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net)
+
 **English** | [简体中文](README.zh-CN.md)
 
 Lightweight Java (21) toolkit for GPS track processing: Douglas-Peucker /
@@ -21,7 +26,11 @@ detection.
 
 ## Installation
 
-Maven:
+> Not yet on Maven Central. Meanwhile, download `geotrack-0.1.0.jar` from the
+> [releases page](https://github.com/vic-998/geotrack/releases) or build from
+> source.
+
+Once published, add it as a dependency:
 
 ```xml
 <dependency>
@@ -36,10 +45,6 @@ Gradle:
 ```groovy
 implementation 'com.boyicloud:geotrack:0.1.0'
 ```
-
-You can also grab `geotrack-0.1.0.jar` straight from
-[`Releases`](https://github.com/vic-998/geotrack/releases), or run
-`mvn install` locally and reference it from your build.
 
 ## Quick start
 
@@ -238,41 +243,20 @@ com.boyicloud.geotrack
     └── GeoMath                 geodesic math (haversine/bearing/projection/triangle area/...)
 ```
 
-## Build & package
+## Building from source
 
 ```bash
-# compile + test + package (produces target/geotrack-0.1.0.jar)
-mvn clean package
-
-# skip tests
-mvn clean package -DskipTests
-
-# install into the local repository for other projects
-mvn clean install
+mvn clean package        # compile, test and package
+mvn clean install        # install into the local Maven repository
 ```
 
-The `package` phase also produces `geotrack-0.1.0.jar`, `-sources.jar` and
-`-javadoc.jar`.
+Requires JDK 21+ and Maven 3.9+.
 
-## Publishing to Maven Central
+## Contributing
 
-`pom.xml` already wires up `maven-source-plugin`, `maven-javadoc-plugin`,
-`maven-gpg-plugin` and a `distributionManagement` section (OSSRH). Before
-publishing:
-
-1. Confirm the `url`, `scm` and `developers` in `pom.xml`. The `groupId`
-   `com.boyicloud` maps to the `boyicloud.com` domain, so verify ownership with a
-   DNS `TXT` record when registering the namespace on the Central Portal;
-2. configure the `ossrh` account in `~/.m2/settings.xml`;
-3. prepare a GPG key and deploy:
-
-```bash
-mvn clean deploy -Dgpg.passphrase=YOUR_PASSPHRASE
-```
-
-Use `mvn verify` to sign without publishing, or `-Dgpg.skip=true` to skip
-signing for a local build.
+Issues and pull requests are welcome. Please run `mvn clean verify` before
+opening a PR.
 
 ## License
 
-[Apache License 2.0](LICENSE)
+Released under the [Apache License 2.0](LICENSE).
